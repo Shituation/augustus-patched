@@ -67,7 +67,7 @@ endif()
 set(PROJECT_VERSION_MAJOR 4)
 set(PROJECT_VERSION_MINOR 0)
 set(PROJECT_VERSION_PATCH 0)
-set(IS_RELEASE_VERSION FALSE)
+set(IS_RELEASE_VERSION TRUE)
 
 if(IS_RELEASE_VERSION)
     set(PROJECT_VERSION_TWEAK 0)
@@ -790,6 +790,11 @@ else()
     add_executable(${SHORT_NAME} WIN32 ${SOURCE_FILES})
 endif()
 
+# 🔧 Explicitly set WIN32_EXECUTABLE property to suppress console window on Windows
+if(WIN32 AND NOT ${TARGET_PLATFORM} STREQUAL "android")
+    set_target_properties(${SHORT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+
 if(${TARGET_PLATFORM} STREQUAL "emscripten")
     set(CMAKE_EXECUTABLE_SUFFIX .html)
     set_target_properties(${SHORT_NAME} PROPERTIES LINK_FLAGS "-lidbfs.js -s SINGLE_FILE=1 -s DEMANGLE_SUPPORT=1 -s DYNCALLS=1 --shell-file ${PROJECT_SOURCE_DIR}/res/shell.html --embed-file ${ASSETS_DIR}@/assets -s INITIAL_MEMORY=268435456 -s ALLOW_MEMORY_GROWTH=1 -s DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0 -s SAFE_HEAP=1 -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS=[\"_main\"] -s EXPORTED_RUNTIME_METHODS=[\"callMain\",\"FS\"] -s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE=[\"$autoResumeAudioContext\"] --bind")
@@ -1013,6 +1018,12 @@ else()
         target_link_libraries(${SHORT_NAME} ${log-lib} ${android-lib})
     endif()
     target_link_libraries(${SHORT_NAME} ${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY})
+
+    # 🔧 Link SDL2main.lib on Windows to provide WinMain
+    if(WIN32 AND SDL2MAIN_LIBRARY)
+        target_link_libraries(${SHORT_NAME} ${SDL2MAIN_LIBRARY})
+    endif()
+
     if(NOT APPLE AND NOT ${TARGET_PLATFORM} STREQUAL "android")
         install(TARGETS ${SHORT_NAME} RUNTIME DESTINATION bin)
     endif()
