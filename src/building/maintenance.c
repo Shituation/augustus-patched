@@ -187,7 +187,7 @@ void building_maintenance_check_fire_collapse(void)
         // damage
         b->damage_risk += random_building == random_global ? 3 : 1;
         if (tutorial_extra_damage_risk()) {
-            b->damage_risk += 5;
+            b->damage_risk += 4;
         }
         if (b->house_size && b->subtype.house_level <= HOUSE_LARGE_TENT) {
             b->damage_risk = 0;
@@ -205,9 +205,9 @@ void building_maintenance_check_fire_collapse(void)
             } else if (b->house_population <= 0) {
                 fire_increase = 0;
             } else if (b->subtype.house_level <= HOUSE_LARGE_SHACK) {
-                fire_increase += 10;
+                fire_increase += 6;
             } else if (b->subtype.house_level <= HOUSE_GRAND_INSULA) {
-                fire_increase += 5;
+                fire_increase += 4;
             } else {
                 fire_increase += 2;
             }
@@ -217,12 +217,12 @@ void building_maintenance_check_fire_collapse(void)
             if (climate == CLIMATE_NORTHERN) {
                 fire_increase = 0;
             } else if (climate == CLIMATE_DESERT) {
-                fire_increase += 3;
+                fire_increase += 0;
             }
 
             b->fire_risk += fire_increase;
         }
-        if (b->fire_risk > 100) {
+        if (b->fire_risk > 110) {
             fire_building(b);
             recalculate_terrain = 1;
         }
