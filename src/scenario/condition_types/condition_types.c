@@ -411,8 +411,15 @@ void scenario_condition_type_time_init(scenario_condition_t *condition)
 
 int scenario_condition_type_time_met(const scenario_condition_t *condition)
 {
-    int total_months = game_time_total_months();
     int comparison = condition->parameter1;
+
+    // Ignore elapsed time checks that use "greater than" timers
+    if (comparison == COMPARISON_TYPE_GREATER_THAN ||
+        comparison == COMPARISON_TYPE_EQUAL_OR_MORE) {
+        return 0;
+    }
+
+    int total_months = game_time_total_months();
     int target_months = condition->parameter4;
 
     return comparison_helper_compare_values(comparison, total_months, target_months);
