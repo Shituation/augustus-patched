@@ -11,6 +11,11 @@ __CONSTANT FIRES:__
 
 It makes fires mechanics much more forgiving (but not immune or cheaty) to the bad paths of the prefects. Now houses and general buildings are closer to Pharaoh's resistance to fire, making it slower to increase fire risks and giving time to prefects to do its pass. This way you avoid converting the gameplay into an anti-arsonists minigame to make it a city builder again.
 
+__PROSPERITY LOOP:__
+
+In the vanilla game (and Augustus) patricians don't work. This means that you will get into a loop that makes it impossible to progress with scenario objectives. Why? because you need workforce to keep services to keep patricians (high end houses). When you need high prosperity, most of your city will be patricians -> sudden drop of workforce -> services stop running efficiently to maintain patricians -> patricians devolve = prosperity drops sharply. Its the snake that bites its own tail. 
+This patch makes 90% of the patricians add to workforce so you get a slight workforce drop but keep almost all services intact to keep progression going while making adjustments.
+
 
 
 If you struggle to play this game due to these (to my opinion) anti-fun mechanics, I recommend you getting this version instead.
