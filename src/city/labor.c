@@ -206,20 +206,29 @@ const labor_category_data *city_labor_category(int category)
     return &city_data.labor.categories[category];
 }
 
+//PATCH - NOW PATRICIANS CONTRIBUTE 90% TO THE WORKFORCE.
 void city_labor_calculate_workers(int num_plebs, int num_patricians)
 {
     int venus_blessing_modifier = 0;
-    city_data.population.percentage_plebs = calc_percentage(num_plebs, num_plebs + num_patricians);
+
+    city_data.population.percentage_plebs =
+        calc_percentage(num_plebs, num_plebs + num_patricians);
 
     if (config_get(CONFIG_GP_CH_FIXED_WORKERS)) {
         venus_blessing_modifier = city_god_venus_bonus_employment();
-        city_data.population.working_age = calc_adjust_with_percentage(num_plebs, 38 + venus_blessing_modifier);
-        city_data.labor.workers_available = city_data.population.working_age;
-    } else {
-        city_data.population.working_age = calc_adjust_with_percentage(city_population_people_of_working_age(), 60);
-        city_data.labor.workers_available = calc_adjust_with_percentage(
-            city_data.population.working_age, city_data.population.percentage_plebs);
     }
+
+    int pleb_workers =
+        calc_adjust_with_percentage(num_plebs, 38 + venus_blessing_modifier);
+
+    int patrician_workers =
+        calc_adjust_with_percentage(num_patricians, 90);
+
+    city_data.population.working_age =
+        pleb_workers + patrician_workers;
+
+    city_data.labor.workers_available =
+        city_data.population.working_age;
 }
 
 static int is_industry_disabled(building *b)
