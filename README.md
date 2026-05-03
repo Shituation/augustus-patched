@@ -1,4 +1,4 @@
-This is a fork of Augustus mod/remake for Caesar 3. This mod is based on version 4.0.0 of Augustus. It aims to rebalance annoying artificial difficulty that came originally with the game: arsonists and a timer on each mission that puts you into a death spiral losing emperor's favor until he attacks you constantly and destroys your city.
+This is a fork of Augustus mod/remake for Caesar 3. This mod is based on version 4.0.0 of Augustus. It aims to rebalance annoying artificial difficulty that came originally with the game.
 
 
 ### What it does:
