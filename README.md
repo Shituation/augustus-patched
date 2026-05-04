@@ -1,3 +1,7 @@
+<p align="center">
+<img width="726" height="486" alt="TITLE" src="https://github.com/user-attachments/assets/ec3a30bc-94cd-403f-9208-084a111105e6" />
+</p>
+
 This is a fork of Augustus mod/remake for Caesar 3. This mod is based on version 4.0.0 of Augustus. It aims to rebalance annoying artificial difficulty that came originally with the game.
 
 
