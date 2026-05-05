@@ -37,8 +37,16 @@ In the vanilla game (and Augustus) patricians don't work. This means that you wi
 This patch makes 90% of the patricians add to workforce so you get a slight workforce drop but keep almost all services intact to keep progression going while making adjustments.
 
 
+__POTTERY BUG (markets don't buy needed goods):__
 
-If you struggle to play this game due to these (to my opinion) anti-fun mechanics, I recommend you getting this version instead.
+<img width="291" height="311" alt="mhPyEXr5ER" src="https://github.com/user-attachments/assets/ed46e304-ba51-40c2-b780-e7b4bff39aaa" />
+
+
+
+In Caesar 3, there is a bug where markets will check for required goods and if that good is not available it will __stop checking__ for other goods for a while. This creates a problem where if you leave markets by default to buy everything (everyone does this), the market will try to get all the goods and if even one of them is not available (for example fish in maps that don't have it) it will stop checking for the other goods for some time.
+
+
+
 
 
 
