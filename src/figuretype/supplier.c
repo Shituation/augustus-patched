@@ -192,35 +192,68 @@ static int recalculate_market_supplier_destination(figure *f)
 {
     int item = f->collecting_item_id;
     building *market = building_get(f->building_id);
+
     resource_storage_info info[RESOURCE_MAX] = { 0 };
 
-    // Assume we're always on the source road network
-    // Fixes walkers stopping when deciding to recalculate best destination when on different network
+    // Always use the market's road network
     int road_network = market->road_network_id;
 
+    // Gather needed goods + available storage locations
     if (!building_market_get_needed_inventory(market, info) ||
-        !building_distribution_get_resource_storages_for_figure(info, BUILDING_MARKET, road_network, f, MAX_DISTANCE)) {
+        !building_distribution_get_resource_storages_for_figure(
+            info, BUILDING_MARKET, road_network, f, MAX_DISTANCE)) {
         return 0;
     }
 
-    if (f->building_id == info[item].building_id || f->destination_building_id == info[item].building_id) {
+    // If current target is still valid, keep it
+    if (item != RESOURCE_NONE &&
+        info[item].building_id &&
+        (f->building_id == info[item].building_id ||
+         f->destination_building_id == info[item].building_id)) {
         return 1;
     }
 
-    if (info[item].building_id) {
+    // If current item has a better destination, update it
+    if (item != RESOURCE_NONE && info[item].building_id) {
         if (is_better_destination(f, item, &info[item])) {
             return change_market_supplier_destination(f, info[item].building_id);
-        } else {
-            return 1;
         }
     }
-    resource_type fetch_inventory = building_market_fetch_inventory(market, info);
-    if (fetch_inventory == RESOURCE_NONE) {
+
+    // 🔥 SMART SELECTION: pick ONLY available goods
+    resource_type best = RESOURCE_NONE;
+    int best_distance = 999999;
+
+    for (int r = 0; r < RESOURCE_MAX; r++) {
+		// skip goods not needed by market
+		if (!info[r].needed)
+			continue;
+	
+		// 🔥 NEW: only fetch if critically low
+		if (market->resources[r] >= 2)
+			continue;
+	
+		// skip unavailable goods
+		if (info[r].building_id == 0)
+			continue;
+	
+		// choose closest available source
+		if (info[r].min_distance < best_distance) {
+			best_distance = info[r].min_distance;
+			best = (resource_type)r;
+		}
+	}
+
+    // nothing available anywhere
+    if (best == RESOURCE_NONE) {
         return 0;
     }
-    market->data.market.fetch_inventory_id = fetch_inventory;
-    f->collecting_item_id = fetch_inventory;
-    return change_market_supplier_destination(f, info[fetch_inventory].building_id);
+
+    // assign chosen resource
+    market->data.market.fetch_inventory_id = best;
+    f->collecting_item_id = best;
+
+    return change_market_supplier_destination(f, info[best].building_id);
 }
 
 void figure_supplier_action(figure *f)
@@ -230,73 +263,112 @@ void figure_supplier_action(figure *f)
     f->max_roam_length = 800;
 
     building *b = building_get(f->building_id);
+
     if (b->state != BUILDING_STATE_IN_USE ||
         (b->figure_id2 != f->id && b->figure_id != f->id && b->figure_id4 != f->id)) {
         f->state = FIGURE_STATE_DEAD;
+        return;
     }
+
     figure_image_increase_offset(f, 12);
+
     switch (f->action_state) {
-        case FIGURE_ACTION_150_ATTACK:
-            figure_combat_handle_attack(f);
-            break;
-        case FIGURE_ACTION_149_CORPSE:
-            figure_combat_handle_corpse(f);
-            break;
-        case FIGURE_ACTION_145_SUPPLIER_GOING_TO_STORAGE:
-            figure_movement_move_ticks(f, 1);
-            if (f->direction == DIR_FIGURE_AT_DESTINATION) {
-                f->wait_ticks = 0;
-                f->previous_tile_x = f->x;
-                f->previous_tile_y = f->y;
-                int id = f->id;
-                if (!resource_is_food(f->collecting_item_id)) {
-                    int max_amount = f->type == FIGURE_LIGHTHOUSE_SUPPLIER ? 1 : 2;
-                    if (!take_resource_from_warehouse(f, f->destination_building_id, max_amount)) {
-                        f->state = FIGURE_STATE_DEAD;
-                    }
-                } else {
-                    if (!take_food_from_granary(f, f->building_id, f->destination_building_id)) {
-                        f->state = FIGURE_STATE_DEAD;
-                    }
-                }
-                f = figure_get(id);
-                f->action_state = FIGURE_ACTION_146_SUPPLIER_RETURNING;
-                f->destination_x = f->source_x;
-                f->destination_y = f->source_y;
-            } else if (f->direction == DIR_FIGURE_REROUTE || f->direction == DIR_FIGURE_LOST) {
-                f->action_state = FIGURE_ACTION_146_SUPPLIER_RETURNING;
-                f->destination_x = f->source_x;
-                f->destination_y = f->source_y;
-                figure_route_remove(f);
-            } else if (f->type == FIGURE_MARKET_SUPPLIER && f->wait_ticks++ > FIGURE_REROUTE_DESTINATION_TICKS) {
-                f->wait_ticks = 0;
+
+    case FIGURE_ACTION_145_SUPPLIER_GOING_TO_STORAGE:
+        figure_movement_move_ticks(f, 1);
+
+        if (f->direction == DIR_FIGURE_AT_DESTINATION) {
+            f->wait_ticks = 0;
+            f->previous_tile_x = f->x;
+            f->previous_tile_y = f->y;
+
+            int id = f->id;
+            int success = 0;
+
+            if (!resource_is_food(f->collecting_item_id)) {
+                int max_amount = f->type == FIGURE_LIGHTHOUSE_SUPPLIER ? 1 : 2;
+                success = take_resource_from_warehouse(f, f->destination_building_id, max_amount);
+            } else {
+                success = take_food_from_granary(f, f->building_id, f->destination_building_id);
+            }
+
+            f = figure_get(id);
+
+            if (!success) {
+                // 🔥 FIX: instead of dying, try another resource
                 if (!recalculate_market_supplier_destination(f)) {
+                    // nothing else available → THEN give up
                     f->action_state = FIGURE_ACTION_146_SUPPLIER_RETURNING;
                     f->collecting_item_id = RESOURCE_NONE;
                     f->destination_x = f->source_x;
                     f->destination_y = f->source_y;
                     figure_route_remove(f);
                 }
+                return;
             }
-            break;
-        case FIGURE_ACTION_146_SUPPLIER_RETURNING:
-            figure_movement_move_ticks(f, 1);
-            if (f->direction == DIR_FIGURE_AT_DESTINATION || f->direction == DIR_FIGURE_LOST) {
-                if (f->direction == DIR_FIGURE_AT_DESTINATION && f->type == FIGURE_LIGHTHOUSE_SUPPLIER) {
-                    building_get(f->building_id)->resources[RESOURCE_TIMBER] += 100;
-                }
-                f->state = FIGURE_STATE_DEAD;
-            } else if (f->direction == DIR_FIGURE_REROUTE) {
+
+            // success → return normally
+            f->action_state = FIGURE_ACTION_146_SUPPLIER_RETURNING;
+            f->destination_x = f->source_x;
+            f->destination_y = f->source_y;
+        }
+        else if (f->direction == DIR_FIGURE_REROUTE || f->direction == DIR_FIGURE_LOST) {
+            f->action_state = FIGURE_ACTION_146_SUPPLIER_RETURNING;
+            f->destination_x = f->source_x;
+            f->destination_y = f->source_y;
+            figure_route_remove(f);
+        }
+        else if (f->type == FIGURE_MARKET_SUPPLIER &&
+                 f->wait_ticks++ > FIGURE_REROUTE_DESTINATION_TICKS) {
+
+            f->wait_ticks = 0;
+
+            if (!recalculate_market_supplier_destination(f)) {
+                f->action_state = FIGURE_ACTION_146_SUPPLIER_RETURNING;
+                f->collecting_item_id = RESOURCE_NONE;
+                f->destination_x = f->source_x;
+                f->destination_y = f->source_y;
                 figure_route_remove(f);
             }
-            break;
+        }
+        break;
+
+    case FIGURE_ACTION_146_SUPPLIER_RETURNING:
+        figure_movement_move_ticks(f, 1);
+
+        if (f->direction == DIR_FIGURE_AT_DESTINATION ||
+            f->direction == DIR_FIGURE_LOST) {
+
+            if (f->direction == DIR_FIGURE_AT_DESTINATION &&
+                f->type == FIGURE_LIGHTHOUSE_SUPPLIER) {
+                building_get(f->building_id)->resources[RESOURCE_TIMBER] += 100;
+            }
+
+            f->state = FIGURE_STATE_DEAD;
+        }
+        else if (f->direction == DIR_FIGURE_REROUTE) {
+            figure_route_remove(f);
+        }
+        break;
+
+    case FIGURE_ACTION_150_ATTACK:
+        figure_combat_handle_attack(f);
+        break;
+
+    case FIGURE_ACTION_149_CORPSE:
+        figure_combat_handle_corpse(f);
+        break;
     }
+
+    // (unchanged rendering code below)
+    int dir = figure_image_normalize_direction(
+        f->direction < 8 ? f->direction : f->previous_tile_direction);
+
     if (f->type == FIGURE_MESS_HALL_SUPPLIER) {
         figure_tower_sentry_set_image(f);
     } else if (f->type == FIGURE_PRIEST_SUPPLIER) {
         figure_image_update(f, image_group(GROUP_FIGURE_PRIEST));
     } else if (f->type == FIGURE_BARKEEP_SUPPLIER) {
-        int dir = figure_image_normalize_direction(f->direction < 8 ? f->direction : f->previous_tile_direction);
         if (f->action_state == FIGURE_ACTION_149_CORPSE) {
             f->image_id = assets_get_image_id("Walkers", "Barkeep Death 01") +
                 figure_image_corpse_offset(f);
@@ -304,8 +376,8 @@ void figure_supplier_action(figure *f)
             f->image_id = assets_get_image_id("Walkers", "Barkeep NE 01") +
                 dir * 12 + f->image_offset;
         }
-    } else if (f->type == FIGURE_LIGHTHOUSE_SUPPLIER || f->type == FIGURE_CARAVANSERAI_SUPPLIER) {
-        int dir = figure_image_normalize_direction(f->direction < 8 ? f->direction : f->previous_tile_direction);
+    } else if (f->type == FIGURE_LIGHTHOUSE_SUPPLIER ||
+               f->type == FIGURE_CARAVANSERAI_SUPPLIER) {
         if (f->action_state == FIGURE_ACTION_149_CORPSE) {
             f->image_id = assets_get_image_id("Walkers", "Slave death 01") +
                 figure_image_corpse_offset(f);
@@ -314,7 +386,6 @@ void figure_supplier_action(figure *f)
                 dir * 12 + f->image_offset;
         }
     } else {
-        int dir = figure_image_normalize_direction(f->direction < 8 ? f->direction : f->previous_tile_direction);
         if (f->action_state == FIGURE_ACTION_149_CORPSE) {
             f->image_id = assets_get_image_id("Walkers", "marketbuyer_death_01") +
                 figure_image_corpse_offset(f);
